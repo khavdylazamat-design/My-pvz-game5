@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+
+<html lang="ru">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Сад против зомби 2.0</title>
+
+<style>
+
+*{box-sizing:border-box}
+
+body{
+
+ margin:0;background:#14251b;color:white;
+
+ font-family:Arial;text-align:center;
+
+}
+
+h1{color:#ffe66d;text-shadow:2px 3px #754c20}
+
+#top{
+
+ display:flex;justify-content:center;gap:18px;
+
+ flex-wrap:wrap;padding:12px;
+
+ font-size:18px;background:#263e2c;
+
+}
+
+#shop{
+
+ display:flex;justify-content:center;gap:7px;
+
+ flex-wrap:wrap;padding:12px;
+
+}
+
+button{
+
+ border:2px solid #fff;border-radius:12px;
+
+ padding:12px;background:#438d42;
+
+ color:white;font-weight:bold;
+
+}
+
+button.selected{background:#e9ad36;color:#222}
+
+#game{
+
+ display:grid;grid-template-columns:repeat(9,1fr);
+
+ max-width:900px;margin:12px auto;
+
+ border:5px solid #67472a;
+
+}
+
+.cell{
+
+ aspect-ratio:1;background:#79b84e;
+
+ border:1px solid #57913c;
+
+ position:relative;display:flex;
+
+ align-items:center;justify-content:center;
+
+ font-size:clamp(20px,5vw,38px);
+
+ overflow:hidden;
+
+}
+
+.cell:nth-child(18n+1),
+
+.cell:nth-child(18n+2),
+
+.cell:nth-child(18n+3),
+
+.cell:nth-child(18n+4),
+
+.cell:nth-child(18n+5),
+
+.cell:nth-child(18n+6),
+
+.cell:nth-child(18n+7),
+
+.cell:nth-child(18n+8),
+
+.cell:nth-child(18n+9){background:#86c75b}
+
+.hp{
+
+ position:absolute;bottom:2px;left:5%;
+
+ height:4px;background:#e53935;
+
+}
+
+#message{color:#ffe66d;font-weight:bold}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>🌻 САД ПРОТИВ ЗОМБИ 🧟</h1>
+
+<div id="top">
+
+ <span>☀️ <b id="sun">200</b></span>
+
+ <span>🏆 <b id="score">0</b></span>
+
+ <span>🌊 Волна <b id="wave">1</b></span>
+
+</div>
+
+<div id="shop">
+
+ <button onclick="select('sun',50,this)">🌻 Подсолнух 50</button>
+
+ <button onclick="select('pea',100,this)">🌱 Стрелок 100</button>
+
+ <button onclick="select('wall',75,this)">🥔 Стена 75</button>
+
+ <button onclick="select('bomb',125,this)">💣 Бомба 125</button>
+
+ <button onclick="select('ice',150,this)">❄️ Лёд 150</button>
+
+</div>
+
+<div id="game"></div>
+
+<p id="message">Нажми «Начать игру»!</p>
+
+<button onclick="start()">▶ НАЧАТЬ</button>
+
+<button onclick="pause()">⏸ ПАУЗА</button>
+
+<button onclick="location.reload()">🔄 ЗАНОВО</button>
+
+<script>
+
+const R=5,C=9;
+
+let sun=200,score=0,wave=1;
+
+let plants=[],zombies=[],shots=[];
+
+let selected=null,active=false,ended=false;
+
+let last=0,spawnTimer=0,sunTimer=0;
+
+let game=document.getElementById('game');
+
+for(let r=0;r<R;r++){
+
+ for(let c=0;c<C;c++){
+
+  let el=document.createElement('div');
+
+  el.className='cell';
+
+  el.onclick=()=>place(r,c);
+
+  game.appendChild(el);
+
+ }
+
+}
+
+const types={
+
+ sun:{emoji:'🌻',cost:50,hp:5},
+
+ pea:{emoji:'🌱',cost:100,hp:5},
+
+ wall:{emoji:'🥔',cost:75,hp:35},
+
+ bomb:{emoji:'💣',cost:125,hp:1},
+
+ ice:{emoji:'❄️',cost:150,hp:5}
+
+};
+
+function select(type,cost,btn){
+
+ selected=type;
+
+ document.querySelectorAll('#shop button')
+
+ .forEach(b=>b.classList.remove('selected'));
+
+ btn.classList.add('selected');
+
+}
+
+function place(r,c){
+
+ if(!active||ended||!selected)return;
+
+ if(sun<types[selected].cost)return;
+
+ if(plants.some(p=>p.r===r&&p.c===c))return;
+
+ sun-=types[selected].cost;
+
+ let p={
+
+  r,c,type:selected,
+
+  hp:types[selected].hp,
+
+  timer:0
+
+ };
+
+ plants.push(p);
+
+ if(selected==='bomb'){
+
+  zombies.forEach(z=>{
+
+   if(z.r===r&&Math.abs(z.x-c)<2.2)z.hp-=8;
+
+  });
+
+  p.hp=0;
+
+ }
+
+ render();
+
+}
+
+function spawn(){
+
+ let r=Math.floor(Math.random()*R);
+
+ let kind=Math.random();
+
+ let hp=5,speed=.025,emoji='🧟';
+
+ if(wave>=2&&kind>.65){
+
+  hp=10;speed=.017;emoji='🪖';
+
+ }
+
+ if(wave>=3&&kind>.85){
+
+  hp=18;speed=.012;emoji='👹';
+
+ }
+
+ if(wave>=4&&Math.random()>.8){
+
+  hp=35;speed=.008;emoji='🧟‍♂️';
+
+ }
+
+ zombies.push({r,x:8.7,hp,max:hp,speed,emoji});
+
+}
+
+function start(){
+
+ if(active||ended)return;
+
+ active=true;
+
+ document.getElementById('message').textContent=
+
+ 'Защити свой сад!';
+
+ last=performance.now();
+
+ requestAnimationFrame(loop);
+
+}
+
+function pause(){
+
+ active=!active;
+
+ if(active){
+
+  last=performance.now();
+
+  document.getElementById('message').textContent='Игра продолжается!';
+
+  requestAnimationFrame(loop);
+
+ }else{
+
+  document.getElementById('message').textContent='⏸ Пауза';
+
+ }
+
+}
+
+function render(){
+
+ document.getElementById('sun').textContent=sun;
+
+ document.getElementById('score').textContent=score;
+
+ document.getElementById('wave').textContent=wave;
+
+ [...game.children].forEach(el=>el.innerHTML='');
+
+ plants.forEach(p=>{
+
+  let el=game.children[p.r*C+p.c];
+
+  el.textContent=types[p.type].emoji;
+
+ });
+
+ zombies.forEach(z=>{
+
+  let c=Math.max(0,Math.min(8,Math.floor(z.x)));
+
+  let el=game.children[z.r*C+c];
+
+  el.textContent=z.emoji;
+
+ });
+
+ shots.forEach(s=>{
+
+  let c=Math.max(0,Math.min(8,Math.floor(s.x)));
+
+  let el=game.children[s.r*C+c];
+
+  el.textContent=s.ice?'❄️':'🟢';
+
+ });
+
+}
+
+function loop(now){
+
+ if(!active||ended)return;
+
+ let dt=Math.min((now-last)/16,3);
+
+ last=now;
+
+ spawnTimer+=dt;
+
+ sunTimer+=dt;
+
+ if(spawnTimer>Math.max(100,260-wave*15)){
+
+  spawn();spawnTimer=0;
+
+ }
+
+ if(sunTimer>300){
+
+  sun+=25;sunTimer=0;
+
+ }
+
+ plants.forEach(p=>{
+
+  p.timer+=dt;
+
+  if(p.type==='sun'&&p.timer>300){
+
+   sun+=25;p.timer=0;
+
+  }
+
+  if(p.type==='pea'&&p.timer>75){
+
+   shots.push({r:p.r,x:p.c+.5,ice:false});
+
+   p.timer=0;
+
+  }
+
+  if(p.type==='ice'&&p.timer>110){
+
+   shots.push({r:p.r,x:p.c+.5,ice:true});
+
+   p.timer=0;
+
+  }
+
+ });
+
+ shots.forEach(s=>{
+
+  s.x+=.15*dt;
+
+  let z=zombies.find(z=>z.r===s.r&&Math.abs(z.x-s.x)<.35);
+
+  if(z){
+
+   z.hp-=s.ice?2:1;
+
+   if(s.ice)z.speed=.004;
+
+   s.x=99;
+
+   score+=5;
+
+  }
+
+ });
+
+ zombies.forEach(z=>{
+
+  let p=plants.find(p=>p.r===z.r&&Math.abs(z.x-p.c)<.5);
+
+  if(p){
+
+   p.hp-=.012*dt;
+
+  }else{
+
+   z.x-=z.speed*dt;
+
+  }
+
+  if(z.x<0)ended=true;
+
+ });
+
+ plants=plants.filter(p=>p.hp>0);
+
+ zombies=zombies.filter(z=>z.hp>0);
+
+ shots=shots.filter(s=>s.x<9);
+
+ if(score>=100&&wave===1)wave=2;
+
+ if(score>=250&&wave===2)wave=3;
+
+ if(score>=500&&wave===3)wave=4;
+
+ if(score>=900&&wave===4){
+
+  wave=5;
+
+  document.getElementById('message').textContent=
+
+  '👹 ФИНАЛЬНАЯ ВОЛНА!';
+
+ }
+
+ if(ended){
+
+  active=false;
+
+  document.getElementById('message').textContent=
+
+  '🧟 Зомби захватили сад! Попробуй ещё раз.';
+
+  return;
+
+ }
+
+ render();
+
+ requestAnimationFrame(loop);
+
+}
+
+render();
+
+</script>
+
+</body>
+
+</html>
